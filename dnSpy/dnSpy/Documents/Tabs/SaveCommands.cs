@@ -44,6 +44,7 @@ using dnSpy.Contracts.Tabs;
 using dnSpy.Contracts.Utilities;
 using dnSpy.Decompiler.MSBuild;
 using dnSpy.Documents.Tabs.Dialogs;
+using dnSpy.Documents.Tabs.DocViewer.Settings;
 using dnSpy.Properties;
 
 namespace dnSpy.Documents.Tabs {
@@ -60,16 +61,18 @@ namespace dnSpy.Documents.Tabs {
 		readonly IDecompilerService decompilerService;
 		readonly IDocumentTreeViewSettings documentTreeViewSettings;
 		readonly IExportToProjectSettings exportToProjectSettings;
+		readonly IDocumentViewerOptionsService documentViewerOptionsService;
 		readonly Lazy<IBamlDecompiler>? bamlDecompiler;
 		readonly Lazy<IXamlOutputOptionsProvider>? xamlOutputOptionsProvider;
 
 		[ImportingConstructor]
-		ExportProjectCommand(IAppWindow appWindow, IDocumentTreeView documentTreeView, IDecompilerService decompilerService, IDocumentTreeViewSettings documentTreeViewSettings, IExportToProjectSettings exportToProjectSettings, [ImportMany] IEnumerable<Lazy<IBamlDecompiler>> bamlDecompilers, [ImportMany] IEnumerable<Lazy<IXamlOutputOptionsProvider>> xamlOutputOptionsProviders) {
+		ExportProjectCommand(IAppWindow appWindow, IDocumentTreeView documentTreeView, IDecompilerService decompilerService, IDocumentTreeViewSettings documentTreeViewSettings, IExportToProjectSettings exportToProjectSettings, IDocumentViewerOptionsService documentViewerOptionsService, [ImportMany] IEnumerable<Lazy<IBamlDecompiler>> bamlDecompilers, [ImportMany] IEnumerable<Lazy<IXamlOutputOptionsProvider>> xamlOutputOptionsProviders) {
 			this.appWindow = appWindow;
 			this.documentTreeView = documentTreeView;
 			this.decompilerService = decompilerService;
 			this.documentTreeViewSettings = documentTreeViewSettings;
 			this.exportToProjectSettings = exportToProjectSettings;
+			this.documentViewerOptionsService = documentViewerOptionsService;
 			bamlDecompiler = bamlDecompilers.FirstOrDefault();
 			xamlOutputOptionsProvider = xamlOutputOptionsProviders.FirstOrDefault();
 		}
@@ -157,6 +160,7 @@ namespace dnSpy.Documents.Tabs {
 				vm.TotalProgress = 0;
 				vm.IsIndeterminate = false;
 				DnSpyEventSource.Log.ExportToProjectStart();
+				var indenter = owner.documentViewerOptionsService.Default.CreateIndenter();
 				Task.Factory.StartNew(() => {
 					var decompilationContext = new DecompilationContext {
 						CancellationToken = cancellationToken,
@@ -171,6 +175,7 @@ namespace dnSpy.Documents.Tabs {
 					options.GenerateSDKStyleProjects = vm.UseSDKStyleProjectFormat;
 					options.Logger = this;
 					options.ProgressListener = this;
+					options.CreateDecompilerOutput = textWriter => new TextWriterDecompilerOutput(textWriter, indenter);
 
 					bool hasProjectGuid = vm.ProjectGuid.Value is not null;
 					string? guidFormat = null;
