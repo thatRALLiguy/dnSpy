@@ -35,6 +35,7 @@ using dnSpy.Contracts.Extension;
 using dnSpy.Contracts.Images;
 using dnSpy.Contracts.Menus;
 using dnSpy.Contracts.MVVM;
+using dnSpy.Contracts.MVVM.Dialogs;
 using dnSpy.Contracts.Settings.AppearanceCategory;
 using dnSpy.Contracts.Text.Classification;
 using dnSpy.Contracts.ToolBars;
@@ -378,22 +379,51 @@ namespace dnSpy.Documents.Tabs {
 					return;
 			}
 
-			int extracted = 0;
-			foreach (var (entry, filename) in files) {
-				try {
-					Directory.CreateDirectory(Path.GetDirectoryName(filename)!);
-					File.WriteAllBytes(filename, entry.GetData());
-					extracted++;
-				}
-				catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException) {
-					errors.Add($"{entry.RelativePath}: {ex.Message}");
-				}
-			}
+			var task = new BundleExtractionTask(files, errors, existingFiles != 0);
+			var data = new ProgressVM(Dispatcher.CurrentDispatcher, task);
+			var win = new ProgressDlg {
+				DataContext = data,
+				Owner = System.Windows.Application.Current.MainWindow,
+				Title = dnSpy_Resources.ExtractBundleCommand.Replace("_", string.Empty),
+			};
+			win.ShowDialog();
+			if (data.WasError)
+				errors.Add(data.ErrorMessage!);
 
-			var msg = string.Format(dnSpy_Resources.ExtractBundle_Done, extracted, dir);
+			var msg = string.Format(dnSpy_Resources.ExtractBundle_Done, task.Extracted, dir);
 			if (errors.Count != 0)
 				msg += Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, errors.Take(20));
 			MsgBox.Instance.Show(msg);
+		}
+
+		sealed class BundleExtractionTask : IProgressTask {
+			readonly List<(BundleEntry entry, string filename)> files;
+			readonly List<string> errors;
+			readonly bool overwrite;
+			public int Extracted { get; private set; }
+			public bool IsIndeterminate => false;
+			public double ProgressMinimum => 0;
+			public double ProgressMaximum => files.Count;
+			public BundleExtractionTask(List<(BundleEntry entry, string filename)> files, List<string> errors, bool overwrite) {
+				this.files = files;
+				this.errors = errors;
+				this.overwrite = overwrite;
+			}
+			public void Execute(IProgress progress) {
+				for (int i = 0; i < files.Count; i++) {
+					progress.ThrowIfCancellationRequested();
+					var (entry, filename) = files[i];
+					progress.SetDescription(entry.RelativePath);
+					try {
+						entry.ExtractToFile(filename, overwrite, progress.Token);
+						Extracted++;
+					}
+					catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException) {
+						errors.Add($"{entry.RelativePath}: {ex.Message}");
+					}
+					progress.SetTotalProgress(i + 1);
+				}
+			}
 		}
 	}
 }

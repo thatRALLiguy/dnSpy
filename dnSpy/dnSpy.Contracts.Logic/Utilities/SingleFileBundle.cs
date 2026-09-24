@@ -22,6 +22,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using System.Threading;
 using dnlib.DotNet;
 
 namespace dnSpy.Contracts.Utilities {
@@ -99,6 +100,29 @@ namespace dnSpy.Contracts.Utilities {
 		/// <returns></returns>
 		public byte[] GetData() => bundle.ReadData(this);
 
+		/// <summary>Copies the entry without buffering the entire file in memory.</summary>
+		public void CopyTo(Stream destination, CancellationToken cancellationToken = default) =>
+			bundle.CopyData(this, destination, cancellationToken);
+
+		/// <summary>Extracts to a temporary file, replacing the destination only after a successful copy.</summary>
+		public void ExtractToFile(string filename, bool overwrite, CancellationToken cancellationToken = default) {
+			filename = Path.GetFullPath(filename);
+			Directory.CreateDirectory(Path.GetDirectoryName(filename)!);
+			var temporary = filename + "." + Guid.NewGuid().ToString("N") + ".tmp";
+			try {
+				using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+					CopyTo(output, cancellationToken);
+				cancellationToken.ThrowIfCancellationRequested();
+				if (overwrite && File.Exists(filename))
+					File.Replace(temporary, filename, null);
+				else
+					File.Move(temporary, filename);
+			}
+			finally {
+				File.Delete(temporary);
+			}
+		}
+
 		/// <summary>
 		/// Gets <see cref="RelativePath"/> converted to a relative path that can't escape the directory it's
 		/// combined with, or null if the path is invalid (eg. it contains '..' components)
@@ -136,6 +160,8 @@ namespace dnSpy.Contracts.Utilities {
 			0xEE, 0x3B, 0x2D, 0xCE, 0x24, 0xB3, 0x6A, 0xAE,
 		};
 		const int MaxEntries = 0x100000;
+		/// <summary>Maximum size of one entry loaded into memory. Larger entries can still be extracted.</summary>
+		public const int MaxInMemoryEntrySize = 256 * 1024 * 1024;
 
 		readonly Func<Stream> openStream;
 
@@ -151,6 +177,7 @@ namespace dnSpy.Contracts.Utilities {
 		/// <summary>All files stored in the bundle</summary>
 		public IReadOnlyList<BundleEntry> Entries => entries;
 		readonly List<BundleEntry> entries;
+		readonly Dictionary<string, BundleEntry> entriesByPath = new Dictionary<string, BundleEntry>(StringComparer.OrdinalIgnoreCase);
 
 		SingleFileBundle(Func<Stream> openStream, uint majorVersion, uint minorVersion, string bundleId) {
 			this.openStream = openStream;
@@ -195,11 +222,7 @@ namespace dnSpy.Contracts.Utilities {
 			if (index < 0 || path.IndexOfAny(new[] { '/', '\\' }, index) >= 0)
 				return null;
 			var pdbPath = path.Substring(0, index) + ".pdb";
-			foreach (var entry in entries) {
-				if (entry != assembly && StringComparer.OrdinalIgnoreCase.Equals(entry.RelativePath, pdbPath))
-					return entry;
-			}
-			return null;
+			return entriesByPath.TryGetValue(pdbPath, out var entry) && entry != assembly ? entry : null;
 		}
 
 		/// <summary>
@@ -265,7 +288,7 @@ namespace dnSpy.Contracts.Utilities {
 			int numEntries = reader.ReadInt32();
 			if (majorVersion == 0 || majorVersion > 0xFF || numEntries < 0 || numEntries > MaxEntries)
 				return null;
-			var bundleId = reader.ReadString();
+			var bundleId = ReadBoundedString(reader);
 			if (majorVersion >= 2) {
 				// deps.json offset + size, runtimeconfig.json offset + size, flags
 				reader.ReadInt64();
@@ -281,14 +304,33 @@ namespace dnSpy.Contracts.Utilities {
 				long size = reader.ReadInt64();
 				long compressedSize = majorVersion >= 6 ? reader.ReadInt64() : 0;
 				var type = (BundleFileType)reader.ReadByte();
-				var relativePath = reader.ReadString();
+				var relativePath = ReadBoundedString(reader);
 
 				long storedSize = compressedSize != 0 ? compressedSize : size;
 				if (offset < 0 || size < 0 || compressedSize < 0 || storedSize > length || offset > length - storedSize)
 					return null;
-				bundle.entries.Add(new BundleEntry(bundle, type, relativePath, offset, size, compressedSize));
+				var entry = new BundleEntry(bundle, type, relativePath, offset, size, compressedSize);
+				bundle.entries.Add(entry);
+				if (!bundle.entriesByPath.ContainsKey(relativePath))
+					bundle.entriesByPath.Add(relativePath, entry);
 			}
 			return bundle;
+		}
+
+		static string ReadBoundedString(BinaryReader reader) {
+			// BinaryWriter strings have a 7-bit encoded byte length. Bound it before allocating.
+			uint length = 0;
+			for (int shift = 0; shift < 35; shift += 7) {
+				byte value = reader.ReadByte();
+				if (shift == 28 && value > 7)
+					throw new FormatException("Invalid bundle string length");
+				length |= (uint)(value & 0x7F) << shift;
+				if (length > 32768)
+					throw new FormatException("Bundle string is too long");
+				if ((value & 0x80) == 0)
+					return Encoding.UTF8.GetString(ReadExactly(reader.BaseStream, (int)length));
+			}
+			throw new FormatException("Invalid bundle string length");
 		}
 
 		// The apphost is a PE (Windows), ELF (Linux) or Mach-O (macOS) file. Checking it first avoids reading
@@ -356,17 +398,67 @@ namespace dnSpy.Contracts.Utilities {
 		}
 
 		internal byte[] ReadData(BundleEntry entry) {
-			if (entry.Size > int.MaxValue || entry.CompressedSize > int.MaxValue)
-				throw new IOException($"Bundle file is too big: {entry.RelativePath}");
+			if (entry.Size > MaxInMemoryEntrySize)
+				throw new IOException($"Bundle file is too big to load into memory: {entry.RelativePath}. Extract it to disk instead.");
+			var data = new byte[(int)entry.Size];
+			using (var destination = new MemoryStream(data, true))
+				CopyData(entry, destination, CancellationToken.None);
+			return data;
+		}
+
+		internal void CopyData(BundleEntry entry, Stream destination, CancellationToken cancellationToken) {
+			if (destination is null)
+				throw new ArgumentNullException(nameof(destination));
+			cancellationToken.ThrowIfCancellationRequested();
 			using (var stream = openStream()) {
 				stream.Position = entry.Offset;
-				if (!entry.IsCompressed)
-					return ReadExactly(stream, (int)entry.Size);
-
-				var compressed = ReadExactly(stream, (int)entry.CompressedSize);
-				using (var deflateStream = new DeflateStream(new MemoryStream(compressed, false), CompressionMode.Decompress))
-					return ReadExactly(deflateStream, (int)entry.Size);
+				using (var bounded = new EntryStream(stream, entry.IsCompressed ? entry.CompressedSize : entry.Size)) {
+					if (entry.IsCompressed) {
+						using (var deflate = new DeflateStream(bounded, CompressionMode.Decompress))
+							CopyExactly(deflate, destination, entry.Size, cancellationToken);
+					}
+					else
+						CopyExactly(bounded, destination, entry.Size, cancellationToken);
+				}
 			}
+		}
+
+		static void CopyExactly(Stream source, Stream destination, long size, CancellationToken cancellationToken) {
+			var buffer = new byte[65536];
+			while (size > 0) {
+				cancellationToken.ThrowIfCancellationRequested();
+				int read = source.Read(buffer, 0, (int)Math.Min(size, buffer.Length));
+				if (read == 0)
+					throw new IOException("Unexpected end of bundle data");
+				destination.Write(buffer, 0, read);
+				size -= read;
+			}
+			cancellationToken.ThrowIfCancellationRequested();
+			if (source.ReadByte() != -1)
+				throw new IOException("Bundle data exceeds its declared size");
+		}
+
+		sealed class EntryStream : Stream {
+			readonly Stream source;
+			long remaining;
+			public EntryStream(Stream source, long length) {
+				this.source = source;
+				remaining = length;
+			}
+			public override int Read(byte[] buffer, int offset, int count) {
+				int read = source.Read(buffer, offset, (int)Math.Min(count, remaining));
+				remaining -= read;
+				return read;
+			}
+			public override bool CanRead => true;
+			public override bool CanSeek => false;
+			public override bool CanWrite => false;
+			public override long Length => throw new NotSupportedException();
+			public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+			public override void Flush() { }
+			public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+			public override void SetLength(long value) => throw new NotSupportedException();
+			public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 		}
 
 		static byte[] ReadExactly(Stream stream, int size) {

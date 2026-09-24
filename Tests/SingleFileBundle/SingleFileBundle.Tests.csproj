@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../DnSpyCommon.props" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../dnSpy/dnSpy.Contracts.Logic/Utilities/SingleFileBundle.cs" Link="SingleFileBundle.cs" />
+    <PackageReference Include="dnlib" Version="$(DnlibVersion)" />
+  </ItemGroup>
+</Project>
