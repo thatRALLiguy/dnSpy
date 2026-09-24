@@ -7,11 +7,11 @@
     The label is appended to the informational version (title bar, file properties) and the About screen
     shows the label, the base version and the git commit the build was made from.
 
-      /p:DnSpyPrivateBuildLabel=rc2-private    use another label
+      /p:DnSpyPrivateBuildLabel=rc3-private    use another label
       /p:DnSpyPrivateBuild=false               build without the label
   -->
   <PropertyGroup Condition=" '$(DnSpyPrivateBuild)' != 'false' AND '$(DnSpyAssemblyInformationalVersion)' != '' ">
-    <DnSpyPrivateBuildLabel Condition=" '$(DnSpyPrivateBuildLabel)' == '' ">rc1-private</DnSpyPrivateBuildLabel>
+    <DnSpyPrivateBuildLabel Condition=" '$(DnSpyPrivateBuildLabel)' == '' ">rc2-private</DnSpyPrivateBuildLabel>
     <InformationalVersion>$(DnSpyAssemblyInformationalVersion)-$(DnSpyPrivateBuildLabel)</InformationalVersion>
   </PropertyGroup>
 
