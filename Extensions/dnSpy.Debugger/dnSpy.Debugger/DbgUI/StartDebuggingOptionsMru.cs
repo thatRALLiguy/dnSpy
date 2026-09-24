@@ -79,6 +79,16 @@ namespace dnSpy.Debugger.DbgUI {
 			return (info.Options, info.PageGuid);
 		}
 
+		public void RestoreLastOptions(StartDebuggingOptions options, Guid pageGuid, string? filename) {
+			if (options is null)
+				throw new ArgumentNullException(nameof(options));
+			var snapshot = (StartDebuggingOptions)options.Clone();
+			if (filename is not null && filename.Length != 0)
+				Add(filename, snapshot, pageGuid);
+			else
+				lastOptions = (snapshot, pageGuid);
+		}
+
 		public (StartDebuggingOptions options, Guid pageGuid)? TryGetLastOptions() => lastOptions;
 	}
 }

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../DnSpyCommon.props" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <DisableWinExeOutputInference>true</DisableWinExeOutputInference>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../dnSpy/dnSpy/Documents/Tabs/DecompilerOutputSettings.cs" Link="DecompilerOutputSettings.cs" />
+    <Compile Include="../../Extensions/dnSpy.Debugger/dnSpy.Debugger/DbgUI/StartDebuggingOptionsMru.cs" Link="StartDebuggingOptionsMru.cs" />
+    <Reference Include="dnSpy.Contracts.Logic">
+      <HintPath>../../dnSpy/dnSpy.Contracts.Logic/bin/$(Configuration)/$(TargetFramework)/dnSpy.Contracts.Logic.dll</HintPath>
+    </Reference>
+    <Reference Include="dnSpy.Contracts.Debugger">
+      <HintPath>../../dnSpy/dnSpy.Contracts.Debugger/bin/$(Configuration)/$(TargetFramework)/dnSpy.Contracts.Debugger.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
