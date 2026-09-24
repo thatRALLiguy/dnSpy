@@ -671,5 +671,32 @@ namespace dnSpy.Console.Properties {
                 return ResourceManager.GetString("UsageHeader", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to also decompile the .NET runtime and Microsoft library assemblies stored in single-file bundles.
+        /// </summary>
+        internal static string CmdLineDescription_BundleAll {
+            get {
+                return ResourceManager.GetString("CmdLineDescription_BundleAll", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {0}: skipped {1} .NET runtime and Microsoft library assemblies stored in the single-file bundle, use --bundle-all to decompile them.
+        /// </summary>
+        internal static string SkippedBundleRuntimeAssemblies {
+            get {
+                return ResourceManager.GetString("SkippedBundleRuntimeAssemblies", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {0}: could not load {1} from the single-file bundle: {2}.
+        /// </summary>
+        internal static string BundleAssemblyLoadError {
+            get {
+                return ResourceManager.GetString("BundleAssemblyLoadError", resourceCulture);
+            }
+        }
     }
 }

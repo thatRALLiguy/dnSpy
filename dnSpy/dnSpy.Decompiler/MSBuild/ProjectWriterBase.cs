@@ -133,6 +133,9 @@ namespace dnSpy.Decompiler.MSBuild {
 				return null;
 			if (ExistsInProject(asm.ManifestModule.Location))
 				return null;
+			// Eg. in-memory assemblies or assemblies stored in a single-file bundle
+			if (!File.Exists(asm.ManifestModule.Location))
+				return null;
 
 			return GetRelativePath(asm.ManifestModule.Location);
 		}

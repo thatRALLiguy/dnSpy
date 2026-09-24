@@ -28,6 +28,7 @@ using dnlib.DotNet;
 using dnlib.PE;
 using dnSpy.Contracts.DnSpy.Metadata;
 using dnSpy.Contracts.Documents;
+using dnSpy.Contracts.Utilities;
 
 namespace dnSpy.Documents {
 	[Export(typeof(IDsDocumentService))]
@@ -182,6 +183,15 @@ namespace dnSpy.Documents {
 				foreach (var info in documents) {
 					if (info.IsAlternativeAssemblyName(assembly))
 						return info.Document;
+				}
+				// Assemblies stored in single-file bundles aren't top level documents
+				foreach (var info in documents) {
+					if (info.Document is DsBundleDocument bundleDocument) {
+						foreach (var child in bundleDocument.Children) {
+							if (comparer.Equals(child.AssemblyDef, assembly))
+								return child;
+						}
+					}
 				}
 			}
 			finally {
@@ -485,6 +495,12 @@ namespace dnSpy.Documents {
 					}
 					catch {
 					}
+				}
+				else if ((peImage.ImageNTHeaders.FileHeader.Characteristics & Characteristics.Dll) == 0) {
+					// It could be a .NET single-file bundle. The .NET assemblies are stored after the apphost.
+					var bundle = fileData is not null ? SingleFileBundle.TryRead(fileData) : SingleFileBundle.TryRead(filename);
+					if (bundle is not null)
+						return new DsBundleDocument(peImage, bundle, DsDotNetDocumentBase.CreateModuleContext(assemblyResolver));
 				}
 
 				return new DsPEDocument(peImage);

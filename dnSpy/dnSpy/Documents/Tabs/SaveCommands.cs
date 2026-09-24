@@ -32,6 +32,7 @@ using dnlib.DotNet;
 using dnlib.PE;
 using dnSpy.Contracts.App;
 using dnSpy.Contracts.Decompiler;
+using dnSpy.Contracts.Documents;
 using dnSpy.Contracts.Documents.Tabs;
 using dnSpy.Contracts.Documents.TreeView;
 using dnSpy.Contracts.ETW;
@@ -40,6 +41,7 @@ using dnSpy.Contracts.Images;
 using dnSpy.Contracts.Menus;
 using dnSpy.Contracts.MVVM;
 using dnSpy.Contracts.Tabs;
+using dnSpy.Contracts.Utilities;
 using dnSpy.Decompiler.MSBuild;
 using dnSpy.Documents.Tabs.Dialogs;
 using dnSpy.Properties;
@@ -309,6 +311,15 @@ namespace dnSpy.Documents.Tabs {
 		ModuleDef[] GetModules() {
 			var hashSet = new HashSet<ModuleDef?>();
 			foreach (var n in documentTreeView.TreeView.TopLevelSelection) {
+				// Export the app's assemblies stored in a single-file bundle, but not the .NET runtime
+				if (n is DsDocumentNode { Document: DsBundleDocument bundleDocument }) {
+					foreach (var child in bundleDocument.Children) {
+						if (!SingleFileBundle.IsFrameworkAssembly(child.AssemblyDef))
+							hashSet.Add(child.ModuleDef);
+					}
+					continue;
+				}
+
 				var asmNode = n.GetAssemblyNode();
 				if (asmNode is not null) {
 					asmNode.TreeNode.EnsureChildrenLoaded();

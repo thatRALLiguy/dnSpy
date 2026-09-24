@@ -2121,4 +2121,16 @@ Filter can be changed in Assembly Explorer options.</value>
   <data name="ToolTip_OpCode" xml:space="preserve">
     <value>OpCode</value>
   </data>
+  <data name="ExtractBundleCommand" xml:space="preserve">
+    <value>E_xtract Bundle Contents...</value>
+  </data>
+  <data name="ExtractBundle_InvalidPath" xml:space="preserve">
+    <value>Skipped a file with an invalid path: {0}</value>
+  </data>
+  <data name="ExtractBundle_OverwriteFiles" xml:space="preserve">
+    <value>{0} file(s) already exist in the selected folder. Do you want to overwrite them?</value>
+  </data>
+  <data name="ExtractBundle_Done" xml:space="preserve">
+    <value>Extracted {0} file(s) to {1}</value>
+  </data>
 </root>

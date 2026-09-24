@@ -20,6 +20,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using dnlib.DotNet;
 using dnlib.PE;
 using dnSpy.Contracts.Utilities;
@@ -147,6 +148,100 @@ namespace dnSpy.Contracts.Documents {
 
 		/// <inheritdoc/>
 		public void Dispose() => PEImage!.Dispose();
+	}
+
+	/// <summary>
+	/// .NET single-file bundle (an app published with PublishSingleFile=true). It's a native apphost with the
+	/// app's files appended to it. The children are the .NET assemblies stored in the bundle.
+	/// </summary>
+	public sealed class DsBundleDocument : DsDocument, IDsPEDocument, IDisposable {
+		readonly ModuleContext moduleContext;
+
+		/// <inheritdoc/>
+		public override DsDocumentInfo? SerializedDocument => DsDocumentInfo.CreateDocument(Filename);
+		/// <inheritdoc/>
+		public override IDsDocumentNameKey Key => FilenameKey.CreateFullPath(Filename);
+		/// <inheritdoc/>
+		public override IPEImage? PEImage { get; }
+
+		/// <summary>
+		/// Gets the bundle
+		/// </summary>
+		public SingleFileBundle Bundle { get; }
+
+		/// <summary>
+		/// Constructor
+		/// </summary>
+		/// <param name="peImage">PE image of the apphost</param>
+		/// <param name="bundle">Bundle</param>
+		/// <param name="moduleContext">Module context used when loading the assemblies stored in the bundle</param>
+		public DsBundleDocument(IPEImage peImage, SingleFileBundle bundle, ModuleContext moduleContext) {
+			PEImage = peImage ?? throw new ArgumentNullException(nameof(peImage));
+			Bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
+			this.moduleContext = moduleContext ?? throw new ArgumentNullException(nameof(moduleContext));
+			Filename = peImage.Filename ?? string.Empty;
+		}
+
+		/// <inheritdoc/>
+		protected override TList<IDsDocument> CreateChildren() {
+			var list = new TList<IDsDocument>();
+			// The files don't exist on disk but they get a filename in the same directory as the bundle so
+			// that other files (eg. symbols and referenced assemblies) can be found
+			var dir = string2.IsNullOrEmpty(Filename) ? string.Empty : Path.GetDirectoryName(Filename) ?? string.Empty;
+			foreach (var entry in Bundle.Entries) {
+				if (!entry.IsPossibleAssembly)
+					continue;
+				var relativePath = entry.GetSafeRelativePath();
+				if (relativePath is null)
+					continue;
+				var document = TryCreateDocument(entry, Path.Combine(dir, relativePath));
+				if (document is not null)
+					list.Add(document);
+			}
+			return list;
+		}
+
+		IDsDocument? TryCreateDocument(BundleEntry entry, string filename) {
+			IPEImage? peImage = null;
+			try {
+				var data = entry.GetData();
+				peImage = new PEImage(data, filename, ImageLayout.File, verify: true);
+				// .NET Core 3.x bundles don't store the file type so it could be a native file
+				if (peImage.ImageNTHeaders.OptionalHeader.DataDirectories[14].VirtualAddress == 0) {
+					peImage.Dispose();
+					return null;
+				}
+				var options = new ModuleCreationOptions(moduleContext) { TryToLoadPdbFromDisk = false };
+				var module = ModuleDefMD.Load(peImage, options);
+				TryLoadSymbols(module, entry);
+				return DsDotNetDocument.CreateModule(DsDocumentInfo.CreateInMemory(() => (data, true), filename), module, loadSyms: false);
+			}
+			catch {
+				peImage?.Dispose();
+				return null;
+			}
+		}
+
+		void TryLoadSymbols(ModuleDefMD module, BundleEntry entry) {
+			try {
+				var pdbEntry = Bundle.FindSymbols(entry);
+				if (pdbEntry is not null)
+					module.LoadPdb(pdbEntry.GetData());
+				else
+					module.LoadPdb();
+			}
+			catch {
+			}
+		}
+
+		/// <inheritdoc/>
+		public void Dispose() {
+			if (ChildrenLoaded) {
+				foreach (var child in Children)
+					(child as IDisposable)?.Dispose();
+			}
+			PEImage!.Dispose();
+		}
 	}
 
 	/// <summary>
