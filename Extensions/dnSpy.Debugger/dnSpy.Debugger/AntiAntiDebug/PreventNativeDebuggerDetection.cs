@@ -95,7 +95,7 @@ namespace dnSpy.Debugger.AntiAntiDebug {
 			try {
 				context = new DbgNativeFunctionHookContextImpl(process);
 			}
-			catch (Exception ex) when (ex is Win32Exception || ex is InvalidOperationException || ex is ArgumentException) {
+			catch (Exception ex) when (ex is DbgHookException || ex is Win32Exception || ex is InvalidOperationException || ex is ArgumentException) {
 				// Eg. the process has exited. This is called on the debugger thread so don't let it crash dnSpy.
 				process.DbgManager.WriteMessage($"Couldn't patch debugger detection functions: {ex.Message}");
 				return;

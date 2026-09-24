@@ -129,7 +129,9 @@ namespace dnSpy.MainApp {
 		public async Task<UpdateCheckInfo> CheckForUpdatesAsync() {
 			var updateInfo = await TryGetLatestVersionAsync();
 			if (updateInfo is not null) {
-				if (updateInfo.Value.Version > currentVersion || !isFinalRelease && updateInfo.Value.Version == currentVersion)
+				// A private build has the same version as the official release it's based on, which doesn't have
+				// its changes, so only report newer official releases.
+				if (updateInfo.Value.Version > currentVersion || !isFinalRelease && !PrivateBuildInfo.IsPrivateBuild && updateInfo.Value.Version == currentVersion)
 					return new UpdateCheckInfo(true, updateInfo.Value);
 				return new UpdateCheckInfo(false, default);
 			}

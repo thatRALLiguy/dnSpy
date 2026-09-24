@@ -34,7 +34,14 @@ namespace dnSpy.Debugger.AntiAntiDebug {
 		public DbgNativeFunctionHookContextImpl(DbgProcess process) {
 			Process = process ?? throw new ArgumentNullException(nameof(process));
 			processMemoryBlockAllocator = new ProcessMemoryBlockAllocator(process);
-			functionProvider = new DbgHookedNativeFunctionProviderImpl(process, processMemoryBlockAllocator);
+			try {
+				functionProvider = new DbgHookedNativeFunctionProviderImpl(process, processMemoryBlockAllocator);
+			}
+			catch {
+				// Don't leak the process handle
+				processMemoryBlockAllocator.Dispose();
+				throw;
+			}
 		}
 
 		public void Write() {
