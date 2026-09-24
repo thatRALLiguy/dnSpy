@@ -19,6 +19,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.ComponentModel.Composition;
 using System.Diagnostics;
 using System.Linq;
@@ -85,9 +86,24 @@ namespace dnSpy.Debugger.AntiAntiDebug {
 			if (!toHooks.TryGetValue(key, out var hooks))
 				return;
 
+			// A 32-bit process can't read the module list of a 64-bit process (it throws) or patch its code.
+			// Only the Mono engine can debug a 64-bit process from 32-bit dnSpy and it doesn't use the hooks.
+			if (IntPtr.Size == 4 && process.Bitness == 64)
+				return;
+
+			DbgNativeFunctionHookContextImpl context;
+			try {
+				context = new DbgNativeFunctionHookContextImpl(process);
+			}
+			catch (Exception ex) when (ex is Win32Exception || ex is InvalidOperationException || ex is ArgumentException) {
+				// Eg. the process has exited. This is called on the debugger thread so don't let it crash dnSpy.
+				process.DbgManager.WriteMessage($"Couldn't patch debugger detection functions: {ex.Message}");
+				return;
+			}
+
 			var hookedFuncs = new HashSet<(string dll, string function)>();
 			var errors = new List<string>();
-			using (var context = new DbgNativeFunctionHookContextImpl(process)) {
+			using (context) {
 				foreach (var lz in hooks) {
 					var id = (lz.Metadata.Dll, lz.Metadata.Function);
 					if (hookedFuncs.Contains(id))

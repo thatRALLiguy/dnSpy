@@ -114,7 +114,7 @@ namespace dnSpy.Debugger.AntiAntiDebug {
 		}
 
 		ProcessMemoryBlock AddNewMemory(IntPtr memPtr, uint size) {
-			var mem = new ProcessMemoryBlockImpl((ulong)memPtr.ToInt64(), (int)size);
+			var mem = new ProcessMemoryBlockImpl((ulong)(nuint)(nint)memPtr, (int)size); // Zero-extend, ToInt64() sign-extends in 32-bit dnSpy
 			allocatedMemory.Add(mem);
 			return mem;
 		}

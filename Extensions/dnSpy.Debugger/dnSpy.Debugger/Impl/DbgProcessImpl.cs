@@ -314,12 +314,12 @@ namespace dnSpy.Debugger.Impl {
 			if (size < 0)
 				throw new ArgumentOutOfRangeException(nameof(size));
 			var dest = (byte*)destination;
-			if (hProcess.IsClosed || (Bitness == 32 && address > uint.MaxValue)) {
+			if (hProcess.IsClosed || (Is32BitAddressSpace && address > uint.MaxValue)) {
 				Clear(dest, size);
 				return;
 			}
 
-			ulong endAddr = Bitness == 32 ? (ulong)uint.MaxValue + 1 : 0UL;
+			ulong endAddr = Is32BitAddressSpace ? (ulong)uint.MaxValue + 1 : 0UL;
 			uint count = (uint)size;
 			var hProcessLocal = hProcess.DangerousGetHandle();
 			ulong pageSize = (ulong)Environment.SystemPageSize;
@@ -352,6 +352,10 @@ namespace dnSpy.Debugger.Impl {
 
 		unsafe void Clear(byte* destination, int size) => Memset.Clear(destination, 0, size);
 
+		// A 32-bit dnSpy can't pass a 64-bit address to ReadProcessMemory()/WriteProcessMemory(). Casting it
+		// to a pointer would silently drop the high 32 bits and read/write the wrong memory.
+		bool Is32BitAddressSpace => Bitness == 32 || IntPtr.Size == 4;
+
 		public unsafe override void WriteMemory(ulong address, byte[] source, int sourceIndex, int size) {
 			if (source is null)
 				throw new ArgumentNullException(nameof(source));
@@ -369,10 +373,10 @@ namespace dnSpy.Debugger.Impl {
 
 		public override void WriteMemory(ulong address, void* source, int size) {
 			var src = (byte*)source;
-			if (hProcess.IsClosed || (Bitness == 32 && address > uint.MaxValue))
+			if (hProcess.IsClosed || (Is32BitAddressSpace && address > uint.MaxValue))
 				return;
 
-			ulong endAddr = Bitness == 32 ? (ulong)uint.MaxValue + 1 : 0UL;
+			ulong endAddr = Is32BitAddressSpace ? (ulong)uint.MaxValue + 1 : 0UL;
 			uint count = (uint)size;
 			var hProcessLocal = hProcess.DangerousGetHandle();
 			ulong pageSize = (ulong)Environment.SystemPageSize;
