@@ -11,5 +11,8 @@ namespace dnSpy.Documents.Tabs.DocViewer.Settings {
 		/// <returns></returns>
 		public static Indenter CreateIndenter(this ICommonEditorOptions options) =>
 			new Indenter(options.IndentSize, options.TabSize, useTabs: !options.ConvertTabsToSpaces);
+
+		public static DecompilerOutputSettings CreateOutputSettings(this ICommonEditorOptions options) =>
+			new DecompilerOutputSettings(options.IndentSize, options.TabSize, !options.ConvertTabsToSpaces);
 	}
 }

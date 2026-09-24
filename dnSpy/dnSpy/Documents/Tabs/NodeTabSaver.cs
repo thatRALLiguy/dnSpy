@@ -50,7 +50,7 @@ namespace dnSpy.Documents.Tabs {
 			this.documentViewerOptionsService = documentViewerOptionsService;
 		}
 
-		public ITabSaver? Create(IDocumentTab tab) => NodeTabSaver.TryCreate(documentTreeNodeDecompiler, tab, messageBoxService, pickSaveFilename, documentViewerOptionsService.Default.CreateIndenter());
+		public ITabSaver? Create(IDocumentTab tab) => NodeTabSaver.TryCreate(documentTreeNodeDecompiler, tab, messageBoxService, pickSaveFilename, documentViewerOptionsService.Default.CreateOutputSettings());
 	}
 
 	sealed class NodeTabSaver : ITabSaver {
@@ -61,9 +61,9 @@ namespace dnSpy.Documents.Tabs {
 		readonly DocumentTreeNodeData[] nodes;
 		readonly IDocumentViewer documentViewer;
 		readonly IPickSaveFilename pickSaveFilename;
-		readonly Indenter indenter;
+		readonly DecompilerOutputSettings outputSettings;
 
-		public static NodeTabSaver? TryCreate(IDocumentTreeNodeDecompiler documentTreeNodeDecompiler, IDocumentTab tab, IMessageBoxService messageBoxService, IPickSaveFilename pickSaveFilename, Indenter indenter) {
+		public static NodeTabSaver? TryCreate(IDocumentTreeNodeDecompiler documentTreeNodeDecompiler, IDocumentTab tab, IMessageBoxService messageBoxService, IPickSaveFilename pickSaveFilename, DecompilerOutputSettings outputSettings) {
 			if (tab.IsAsyncExecInProgress)
 				return null;
 			if (tab.UIContext is not IDocumentViewer documentViewer)
@@ -74,10 +74,10 @@ namespace dnSpy.Documents.Tabs {
 			var nodes = tab.Content.Nodes.ToArray();
 			if (nodes.Length == 0)
 				return null;
-			return new NodeTabSaver(messageBoxService, tab, documentTreeNodeDecompiler, decompiler, documentViewer, pickSaveFilename, nodes, indenter);
+			return new NodeTabSaver(messageBoxService, tab, documentTreeNodeDecompiler, decompiler, documentViewer, pickSaveFilename, nodes, outputSettings);
 		}
 
-		NodeTabSaver(IMessageBoxService messageBoxService, IDocumentTab tab, IDocumentTreeNodeDecompiler documentTreeNodeDecompiler, IDecompiler decompiler, IDocumentViewer documentViewer, IPickSaveFilename pickSaveFilename, DocumentTreeNodeData[] nodes, Indenter indenter) {
+		NodeTabSaver(IMessageBoxService messageBoxService, IDocumentTab tab, IDocumentTreeNodeDecompiler documentTreeNodeDecompiler, IDecompiler decompiler, IDocumentViewer documentViewer, IPickSaveFilename pickSaveFilename, DocumentTreeNodeData[] nodes, DecompilerOutputSettings outputSettings) {
 			this.messageBoxService = messageBoxService;
 			this.tab = tab;
 			this.documentTreeNodeDecompiler = documentTreeNodeDecompiler;
@@ -85,7 +85,7 @@ namespace dnSpy.Documents.Tabs {
 			this.documentViewer = documentViewer;
 			this.nodes = nodes;
 			this.pickSaveFilename = pickSaveFilename;
-			this.indenter = indenter;
+			this.outputSettings = outputSettings;
 		}
 
 		public bool CanSave => !tab.IsAsyncExecInProgress;
@@ -102,7 +102,7 @@ namespace dnSpy.Documents.Tabs {
 			try {
 				var decompilationContext = new DecompilationContext();
 				decompileContext.Writer = new StreamWriter(filename);
-				var output = new TextWriterDecompilerOutput(decompileContext.Writer, indenter);
+				var output = outputSettings.CreateOutput(decompileContext.Writer);
 				var dispatcher = Dispatcher.CurrentDispatcher;
 				decompileContext.DecompileNodeContext = new DecompileNodeContext(decompilationContext, decompiler, output, NullDocumentWriterService.Instance, dispatcher);
 				return decompileContext;

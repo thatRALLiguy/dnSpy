@@ -54,6 +54,10 @@ jobs:
       - name: Build dnSpy (${{matrix.platform}})
         run: .\build.ps1 ${{matrix.platform}}
 
+      - name: Check export indentation and restored debugging options
+        if: matrix.platform == 'net' || matrix.platform == 'netframework'
+        run: dotnet run --project Tests/UpstreamReview/UpstreamReview.Tests.csproj -c Release -f ${{matrix.build-dir}}
+
       - name: Create output directory
         run: New-Item -ItemType Directory -Path C:\builtfiles\dnSpy-${{matrix.platform}} -Force > $null
         continue-on-error: true

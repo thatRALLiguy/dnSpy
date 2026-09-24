@@ -42,6 +42,7 @@ namespace dnSpy.Debugger.DbgUI {
 		static readonly Guid SETTINGS_GUID = new Guid("1D06F2C9-BC3C-4D44-93B3-729F939F3F97");
 		const string PageGuidAttr = "PageGuid";
 		const string OptionsSectionName = "Options";
+		const string FilenameAttr = "Filename";
 
 		readonly IAppWindow appWindow;
 		readonly IDocumentTabService documentTabService;
@@ -143,7 +144,7 @@ namespace dnSpy.Debugger.DbgUI {
 			}
 
 			mru.Add(info.Filename!, info.Options, vm.SelectedPageGuid);
-			SaveLastOptions(pages, info.Options, vm.SelectedPageGuid);
+			SaveLastOptions(pages, info.Options, vm.SelectedPageGuid, info.Filename);
 			return (info.Options, info.Flags);
 		}
 
@@ -160,15 +161,19 @@ namespace dnSpy.Debugger.DbgUI {
 			var options = page?.DeserializeOptions(optionsSection);
 			if (options is null)
 				return;
-			mru.SetLastOptions(options, pageGuid.Value);
+			// Also restore the per-file entry. Otherwise selecting the same EXE calls
+			// InitializeDefaultOptions and discards saved arguments and working directory.
+			mru.RestoreLastOptions(options, pageGuid.Value, section.Attribute<string>(FilenameAttr));
 		}
 
-		void SaveLastOptions(StartDebuggingOptionsPage[] pages, StartDebuggingOptions options, Guid pageGuid) {
+		void SaveLastOptions(StartDebuggingOptionsPage[] pages, StartDebuggingOptions options, Guid pageGuid, string? filename) {
 			var page = pages.FirstOrDefault(a => a.Guid == pageGuid);
 			if (page is null)
 				return;
 			var section = settingsService.RecreateSection(SETTINGS_GUID);
 			section.Attribute(PageGuidAttr, pageGuid);
+			if (!string.IsNullOrEmpty(filename))
+				section.Attribute(FilenameAttr, filename);
 			if (!page.SerializeOptions(section.CreateSection(OptionsSectionName), options))
 				settingsService.RemoveSection(SETTINGS_GUID);
 		}

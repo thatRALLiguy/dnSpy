@@ -3,6 +3,7 @@ using System.Windows;
 using dnSpy.Text.Editor;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Text.Editor.OptionsExtensionMethods;
+using Microsoft.VisualStudio.Text.Operations;
 
 namespace dnSpy.Text.Operations {
 	static class PlainTextClipboard {

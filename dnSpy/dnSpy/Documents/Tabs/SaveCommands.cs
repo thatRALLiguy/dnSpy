@@ -160,7 +160,9 @@ namespace dnSpy.Documents.Tabs {
 				vm.TotalProgress = 0;
 				vm.IsIndeterminate = false;
 				DnSpyEventSource.Log.ExportToProjectStart();
-				var indenter = owner.documentViewerOptionsService.Default.CreateIndenter();
+				// Snapshot settings on the UI thread; each parallel output needs its own mutable indenter.
+				var editorOptions = owner.documentViewerOptionsService.Default;
+				var outputSettings = new DecompilerOutputSettings(editorOptions.IndentSize, editorOptions.TabSize, !editorOptions.ConvertTabsToSpaces);
 				Task.Factory.StartNew(() => {
 					var decompilationContext = new DecompilationContext {
 						CancellationToken = cancellationToken,
@@ -175,7 +177,7 @@ namespace dnSpy.Documents.Tabs {
 					options.GenerateSDKStyleProjects = vm.UseSDKStyleProjectFormat;
 					options.Logger = this;
 					options.ProgressListener = this;
-					options.CreateDecompilerOutput = textWriter => new TextWriterDecompilerOutput(textWriter, indenter);
+					options.CreateDecompilerOutput = outputSettings.CreateOutput;
 
 					bool hasProjectGuid = vm.ProjectGuid.Value is not null;
 					string? guidFormat = null;
