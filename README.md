@@ -83,6 +83,7 @@ To debug Unity games, you need this repo too: https://github.com/dnSpyEx/dnSpy-U
 - Go to metadata token or metadata row commands
 - Code tooltips (C# and Visual Basic)
 - Export to project
+- Open .NET single-file bundles (apps published with `PublishSingleFile`), browse and export the bundled assemblies, and extract the bundle contents. `dnSpy.Console` also decompiles bundles (use `--bundle-all` to include the bundled .NET runtime)
 
 # List of other open source libraries used by dnSpy
 

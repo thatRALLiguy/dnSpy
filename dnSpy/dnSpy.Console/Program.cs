@@ -173,6 +173,7 @@ namespace dnSpy_Console {
 		bool decompileBaml = true;
 		bool colorizeOutput;
 		bool sdkProject;
+		bool decompileBundleRuntimeAssemblies;
 		Guid projectGuid = Guid.NewGuid();
 		int numThreads;
 		int mdToken;
@@ -333,6 +334,7 @@ namespace dnSpy_Console {
 		}
 		static readonly UsageInfo[] usageInfos = new UsageInfo[] {
 			new UsageInfo("--sdk-project", null, dnSpy_Console_Resources.CmdLineDescription_SdkProject),
+			new UsageInfo("--bundle-all", null, dnSpy_Console_Resources.CmdLineDescription_BundleAll),
 			new UsageInfo("--asm-path", dnSpy_Console_Resources.CmdLinePath, dnSpy_Console_Resources.CmdLineDescription_AsmPath),
 			new UsageInfo("--user-gac", dnSpy_Console_Resources.CmdLinePath, dnSpy_Console_Resources.CmdLineDescription_UserGAC),
 			new UsageInfo("--no-gac", null, dnSpy_Console_Resources.CmdLineDescription_NoGAC),
@@ -430,6 +432,7 @@ namespace dnSpy_Console {
 			"output-dir",
 			"lang",
 			"sdk-project",
+			"bundle-all",
 			"asm-path",
 			"user-gac",
 			"gac",
@@ -484,6 +487,10 @@ namespace dnSpy_Console {
 					
 					case "--sdk-project":
 						sdkProject = true;
+						break;
+
+					case "--bundle-all":
+						decompileBundleRuntimeAssemblies = true;
 						break;
 
 					case "-o":
@@ -706,12 +713,13 @@ namespace dnSpy_Console {
 			if (mdToken != 0 || typeName is not null) {
 				if (files.Count == 0)
 					throw new ErrorException(dnSpy_Console_Resources.MissingDotNetFilename);
-				if (files.Count != 1)
+				// A single-file bundle can contain more than one assembly so search all of them for the type
+				if (files.Count != 1 && typeName is null)
 					throw new ErrorException(dnSpy_Console_Resources.OnlyOneFileCanBeDecompiled);
 
 				IMemberDef? member;
 				if (typeName is not null)
-					member = FindType(files[0].Module, typeName);
+					member = files.Select(a => FindType(a.Module, typeName)).FirstOrDefault(a => a is not null);
 				else
 					member = files[0].Module.ResolveToken(mdToken) as IMemberDef;
 				if (member is null) {
@@ -821,10 +829,11 @@ namespace dnSpy_Console {
 		IEnumerable<ProjectModuleOptions> GetDotNetFiles() {
 			foreach (var file in files) {
 				if (File.Exists(file)) {
-					var info = OpenNetFile(file);
-					if (info is null)
-						throw new Exception(string.Format(dnSpy_Console_Resources.NotDotNetFile, file));
-					yield return info;
+					var infos = OpenNetFile(file);
+					if (infos.Count == 0)
+						throw new ErrorException(string.Format(dnSpy_Console_Resources.NotDotNetFile, file));
+					foreach (var info in infos)
+						yield return info;
 				}
 				else if (Directory.Exists(file)) {
 					foreach (var info in DumpDir(file, null))
@@ -906,8 +915,7 @@ namespace dnSpy_Console {
 		IEnumerable<ProjectModuleOptions> DumpDir2(string path, string pattern) {
 			pattern ??= "*";
 			foreach (var fi in GetFiles(path, pattern)) {
-				var info = OpenNetFile(fi.FullName);
-				if (info is not null)
+				foreach (var info in OpenNetFile(fi.FullName))
 					yield return info;
 			}
 		}
@@ -944,16 +952,78 @@ namespace dnSpy_Console {
 			}
 		}
 
-		ProjectModuleOptions? OpenNetFile(string file) {
+		List<ProjectModuleOptions> OpenNetFile(string file) {
+			var list = new List<ProjectModuleOptions>();
 			try {
 				file = Path.GetFullPath(file);
 				if (!File.Exists(file))
-					return null;
-				return CreateProjectModuleOptions(ModuleDefMD.Load(file, moduleContext));
+					return list;
+				list.Add(CreateProjectModuleOptions(ModuleDefMD.Load(file, moduleContext)));
+				return list;
 			}
 			catch {
 			}
-			return null;
+
+			// Not a .NET file, but it could be a .NET single-file bundle (the managed assemblies are
+			// stored after the native apphost)
+			var bundle = SingleFileBundle.TryRead(file);
+			if (bundle is not null)
+				list.AddRange(OpenBundle(file, bundle));
+			return list;
+		}
+
+		IEnumerable<ProjectModuleOptions> OpenBundle(string file, SingleFileBundle bundle) {
+			var dir = Path.GetDirectoryName(file)!;
+			int skippedRuntimeAssemblies = 0;
+			foreach (var entry in bundle.Entries) {
+				if (!entry.IsPossibleAssembly)
+					continue;
+				var relativePath = entry.GetSafeRelativePath();
+				if (relativePath is null)
+					continue;
+
+				ModuleDefMD module;
+				try {
+					var options = new ModuleCreationOptions(moduleContext) { TryToLoadPdbFromDisk = false };
+					module = ModuleDefMD.Load(entry.GetData(), options);
+				}
+				catch (BadImageFormatException) {
+					// Native file
+					continue;
+				}
+				catch (Exception ex) {
+					Error(string.Format(dnSpy_Console_Resources.BundleAssemblyLoadError, file, entry.RelativePath, ex.Message));
+					continue;
+				}
+
+				// The files don't exist on disk but the location is used to create project names and to find
+				// other files (eg. symbols) in the same directory as the bundle
+				module.Location = Path.Combine(dir, relativePath);
+
+				if (!decompileBundleRuntimeAssemblies && SingleFileBundle.IsFrameworkAssembly(module.Assembly)) {
+					// Don't decompile it but make sure references to it resolve to the bundled version
+					skippedRuntimeAssemblies++;
+					assemblyResolver.AddToCache(module);
+					continue;
+				}
+
+				TryLoadSymbols(module, bundle, entry);
+				yield return CreateProjectModuleOptions(module);
+			}
+			if (skippedRuntimeAssemblies != 0)
+				Console.Error.WriteLine(dnSpy_Console_Resources.SkippedBundleRuntimeAssemblies, file, skippedRuntimeAssemblies);
+		}
+
+		static void TryLoadSymbols(ModuleDefMD module, SingleFileBundle bundle, BundleEntry entry) {
+			try {
+				var pdbEntry = bundle.FindSymbols(entry);
+				if (pdbEntry is not null)
+					module.LoadPdb(pdbEntry.GetData());
+				else
+					module.LoadPdb();
+			}
+			catch {
+			}
 		}
 
 		ProjectModuleOptions CreateProjectModuleOptions(ModuleDef mod) {

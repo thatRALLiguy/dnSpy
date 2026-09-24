@@ -49,7 +49,7 @@ namespace dnSpy.Debugger.AntiAntiDebug {
 					Name = "???";
 				}
 				Filename = module.FileName ?? "???";
-				Address = (ulong)module.BaseAddress.ToInt64();
+				Address = (ulong)(nuint)(nint)module.BaseAddress; // Zero-extend, ToInt64() sign-extends in 32-bit dnSpy
 				EndAddress = Address + (uint)module.ModuleMemorySize;
 			}
 		}

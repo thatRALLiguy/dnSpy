@@ -50,7 +50,7 @@ namespace dnSpy.Debugger.DotNet.CorDebug.AntiAntiDebug {
 					if (StringComparer.OrdinalIgnoreCase.Equals(clrPath, mod!.FileName)) {
 						FoundClrModule = true;
 						Initialize(mod.FileName);
-						clrDllBaseAddress = (ulong)mod.BaseAddress.ToInt64();
+						clrDllBaseAddress = (ulong)(nuint)(nint)mod.BaseAddress; // Zero-extend, ToInt64() sign-extends in 32-bit dnSpy
 						break;
 					}
 				}

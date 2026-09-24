@@ -338,4 +338,62 @@ namespace dnSpy.Documents.Tabs {
 			}
 		}
 	}
+
+	[ExportMenuItem(Header = "res:ExtractBundleCommand", Group = MenuConstants.GROUP_CTX_DOCUMENTS_OTHER, Order = 40)]
+	sealed class ExtractBundleCtxMenuCommand : MenuItemBase {
+		public override bool IsVisible(IMenuItemContext context) => GetBundleDocument(context) is not null;
+
+		static DsBundleDocument? GetBundleDocument(IMenuItemContext context) {
+			if (context.CreatorObject.Guid != new Guid(MenuConstants.GUIDOBJ_DOCUMENTS_TREEVIEW_GUID))
+				return null;
+			var nodes = context.Find<TreeNodeData[]>();
+			if (nodes?.Length != 1)
+				return null;
+			return (nodes[0] as DsDocumentNode)?.Document as DsBundleDocument;
+		}
+
+		public override void Execute(IMenuItemContext context) {
+			var bundleDocument = GetBundleDocument(context);
+			if (bundleDocument is null)
+				return;
+			var bundleDir = string2.IsNullOrEmpty(bundleDocument.Filename) ? null : Path.GetDirectoryName(bundleDocument.Filename);
+			var dir = new PickDirectory().GetDirectory(bundleDir);
+			if (string2.IsNullOrEmpty(dir))
+				return;
+
+			var files = new List<(BundleEntry entry, string filename)>();
+			var errors = new List<string>();
+			foreach (var entry in bundleDocument.Bundle.Entries) {
+				var relativePath = entry.GetSafeRelativePath();
+				if (relativePath is null)
+					errors.Add(string.Format(dnSpy_Resources.ExtractBundle_InvalidPath, entry.RelativePath));
+				else
+					files.Add((entry, Path.Combine(dir, relativePath)));
+			}
+
+			int existingFiles = files.Count(a => File.Exists(a.filename));
+			if (existingFiles != 0) {
+				var res = MsgBox.Instance.Show(string.Format(dnSpy_Resources.ExtractBundle_OverwriteFiles, existingFiles), MsgBoxButton.Yes | MsgBoxButton.No);
+				if (res != MsgBoxButton.Yes)
+					return;
+			}
+
+			int extracted = 0;
+			foreach (var (entry, filename) in files) {
+				try {
+					Directory.CreateDirectory(Path.GetDirectoryName(filename)!);
+					File.WriteAllBytes(filename, entry.GetData());
+					extracted++;
+				}
+				catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException) {
+					errors.Add($"{entry.RelativePath}: {ex.Message}");
+				}
+			}
+
+			var msg = string.Format(dnSpy_Resources.ExtractBundle_Done, extracted, dir);
+			if (errors.Count != 0)
+				msg += Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, errors.Take(20));
+			MsgBox.Instance.Show(msg);
+		}
+	}
 }

@@ -321,4 +321,13 @@
   <data name="CmdLineDescription_SdkProject" xml:space="preserve">
     <value>generate SDK style project files</value>
   </data>
+  <data name="CmdLineDescription_BundleAll" xml:space="preserve">
+    <value>also decompile the .NET runtime and Microsoft library assemblies stored in single-file bundles</value>
+  </data>
+  <data name="SkippedBundleRuntimeAssemblies" xml:space="preserve">
+    <value>{0}: skipped {1} .NET runtime and Microsoft library assemblies stored in the single-file bundle, use --bundle-all to decompile them</value>
+  </data>
+  <data name="BundleAssemblyLoadError" xml:space="preserve">
+    <value>{0}: could not load {1} from the single-file bundle: {2}</value>
+  </data>
 </root>

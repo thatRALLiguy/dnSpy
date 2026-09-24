@@ -6057,5 +6057,41 @@ namespace dnSpy.Properties {
                 return ResourceManager.GetString("WordWrapHeader", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to E_xtract Bundle Contents....
+        /// </summary>
+        internal static string ExtractBundleCommand {
+            get {
+                return ResourceManager.GetString("ExtractBundleCommand", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Skipped a file with an invalid path: {0}.
+        /// </summary>
+        internal static string ExtractBundle_InvalidPath {
+            get {
+                return ResourceManager.GetString("ExtractBundle_InvalidPath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {0} file(s) already exist in the selected folder. Do you want to overwrite them?.
+        /// </summary>
+        internal static string ExtractBundle_OverwriteFiles {
+            get {
+                return ResourceManager.GetString("ExtractBundle_OverwriteFiles", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Extracted {0} file(s) to {1}.
+        /// </summary>
+        internal static string ExtractBundle_Done {
+            get {
+                return ResourceManager.GetString("ExtractBundle_Done", resourceCulture);
+            }
+        }
     }
 }
