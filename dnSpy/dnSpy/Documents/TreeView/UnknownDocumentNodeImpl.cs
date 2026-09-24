@@ -40,7 +40,12 @@ namespace dnSpy.Documents.TreeView {
 				yield return Context.DocumentTreeView.CreateNode(this, document);
 		}
 
-		protected override void WriteCore(ITextColorWriter output, IDecompiler decompiler, DocumentNodeWriteOptions options) =>
+		protected override void WriteCore(ITextColorWriter output, IDecompiler decompiler, DocumentNodeWriteOptions options) {
 			new NodeFormatter().Write(output, decompiler, Document);
+			if ((options & DocumentNodeWriteOptions.ToolTip) != 0 && Document is DsUnknownDocument { LoadError: string loadError }) {
+				output.WriteLine();
+				output.Write(BoxedTextColor.Error, loadError);
+			}
+		}
 	}
 }

@@ -90,6 +90,15 @@ namespace dnSpy.Contracts.DnSpy.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Not loaded: {0} is too large to load into memory ({1:N0} bytes). Use Extract Bundle Contents to save it to disk..
+        /// </summary>
+        public static string BundleEntryTooLarge {
+            get {
+                return ResourceManager.GetString("BundleEntryTooLarge", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Could not convert &apos;{0}&apos;.
         /// </summary>
         public static string CouldNotConvert {

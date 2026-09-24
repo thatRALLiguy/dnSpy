@@ -6093,5 +6093,14 @@ namespace dnSpy.Properties {
                 return ResourceManager.GetString("ExtractBundle_Done", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Extraction was canceled. Extracted {0} of {1} file(s) to {2}.
+        /// </summary>
+        internal static string ExtractBundle_Canceled {
+            get {
+                return ResourceManager.GetString("ExtractBundle_Canceled", resourceCulture);
+            }
+        }
     }
 }

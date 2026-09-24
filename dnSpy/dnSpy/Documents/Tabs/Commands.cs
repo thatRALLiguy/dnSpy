@@ -390,7 +390,9 @@ namespace dnSpy.Documents.Tabs {
 			if (data.WasError)
 				errors.Add(data.ErrorMessage!);
 
-			var msg = string.Format(dnSpy_Resources.ExtractBundle_Done, task.Extracted, dir);
+			var msg = data.WasCanceled ?
+				string.Format(dnSpy_Resources.ExtractBundle_Canceled, task.Extracted, files.Count, dir) :
+				string.Format(dnSpy_Resources.ExtractBundle_Done, task.Extracted, dir);
 			if (errors.Count != 0)
 				msg += Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, errors.Take(20));
 			MsgBox.Instance.Show(msg);
