@@ -40,4 +40,44 @@
     <Delete Files="$(PublishDir)%(GarbageFile.Identity)" ContinueOnError="WarnAndContinue" />
     <RemoveDir Directories="$(PublishDir)%(GarbageDir.Identity)" ContinueOnError="WarnAndContinue" />
   </Target>
+
+  <!--
+    The .NET x86 apphost isn't large address aware so 32-bit dnSpy can only use 2GB of the address space
+    instead of 4GB on a 64-bit OS. Debugging uses a lot of it (the debugged process' modules, the DAC,
+    metadata, etc) and dnSpy would crash with an OutOfMemoryException. The .NET Framework exes already
+    have the flag set by the C# compiler.
+  -->
+  <UsingTask TaskName="DnSpySetLargeAddressAware" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <AppHostPath ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        const ushort IMAGE_FILE_MACHINE_I386 = 0x014C;
+        const ushort IMAGE_FILE_LARGE_ADDRESS_AWARE = 0x0020;
+        var data = File.ReadAllBytes(AppHostPath);
+        // Only patch 32-bit x86 PE files (not ELF/Mach-O apphosts or 64-bit apphosts)
+        if (data.Length < 0x40 || data[0] != (byte)'M' || data[1] != (byte)'Z')
+          return true;
+        int peOffset = BitConverter.ToInt32(data, 0x3C);
+        if (peOffset < 0 || peOffset > data.Length - 24 || BitConverter.ToUInt32(data, peOffset) != 0x00004550)
+          return true;
+        if (BitConverter.ToUInt16(data, peOffset + 4) != IMAGE_FILE_MACHINE_I386)
+          return true;
+        int characteristicsOffset = peOffset + 22;
+        ushort characteristics = BitConverter.ToUInt16(data, characteristicsOffset);
+        if ((characteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE) != 0)
+          return true;
+        characteristics |= IMAGE_FILE_LARGE_ADDRESS_AWARE;
+        data[characteristicsOffset] = (byte)characteristics;
+        data[characteristicsOffset + 1] = (byte)(characteristics >> 8);
+        File.WriteAllBytes(AppHostPath, data);
+        Log.LogMessage(MessageImportance.Normal, "Set IMAGE_FILE_LARGE_ADDRESS_AWARE: " + AppHostPath);
+      ]]></Code>
+    </Task>
+  </UsingTask>
+  <Target Name="DnSpySetAppHostLargeAddressAware" AfterTargets="_CreateAppHost" Condition=" '$(AppHostIntermediatePath)' != '' AND Exists('$(AppHostIntermediatePath)') ">
+    <DnSpySetLargeAddressAware AppHostPath="$(AppHostIntermediatePath)" />
+  </Target>
 </Project>

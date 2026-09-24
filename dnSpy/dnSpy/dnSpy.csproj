@@ -39,6 +39,8 @@
     <When Condition="'$(RuntimeIdentifier)' == 'win-x86' And '$(IsDotNetFramework)' == 'false'">
       <PropertyGroup>
         <ApplicationIcon>Images\dnSpy-x86.ico</ApplicationIcon>
+        <!-- Server GC creates one heap per CPU core which uses too much of the 32-bit address space -->
+        <ServerGarbageCollection>false</ServerGarbageCollection>
       </PropertyGroup>
     </When>
     <Otherwise>

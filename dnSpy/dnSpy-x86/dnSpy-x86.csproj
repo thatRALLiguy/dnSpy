@@ -18,7 +18,8 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
 
-    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <!-- Server GC creates one heap per CPU core which uses too much of the 32-bit address space -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
 
     <PlatformTarget Condition="'$(IsDotNetFramework)' == 'false' AND '$(RuntimeIdentifier)' == ''" >x86</PlatformTarget>
@@ -47,5 +48,10 @@
   <ItemGroup>
     <ProjectReference Include="..\dnSpy\dnSpy.csproj" />
   </ItemGroup>
+
+  <!-- app.config is shared with the 64-bit dnSpy.exe. Disable server GC in the 32-bit exe's config file. -->
+  <Target Name="DnSpyX86DisableServerGC" AfterTargets="CopyFilesToOutputDirectory" Condition=" '$(IsDotNetFramework)' == 'true' AND Exists('$(TargetPath).config') ">
+    <XmlPoke XmlInputPath="$(TargetPath).config" Query="/configuration/runtime/gcServer/@enabled" Value="false" />
+  </Target>
 
 </Project>
