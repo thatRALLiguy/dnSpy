@@ -107,8 +107,10 @@ namespace dnSpy.Contracts.Utilities {
 		/// <summary>Extracts to a temporary file, replacing the destination only after a successful copy.</summary>
 		public void ExtractToFile(string filename, bool overwrite, CancellationToken cancellationToken = default) {
 			filename = Path.GetFullPath(filename);
-			Directory.CreateDirectory(Path.GetDirectoryName(filename)!);
-			var temporary = filename + "." + Guid.NewGuid().ToString("N") + ".tmp";
+			var directory = Path.GetDirectoryName(filename)!;
+			Directory.CreateDirectory(directory);
+			// Don't include the destination's name, a long name plus the suffix could exceed the max name length
+			var temporary = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp");
 			try {
 				using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
 					CopyTo(output, cancellationToken);
