@@ -1,0 +1,32 @@
+<Project>
+  <!--
+    Marks builds of this fork so they can't be confused with official dnSpyEx releases.
+
+    DnSpyAssemblyVersion and DnSpyAssemblyInformationalVersion (DnSpyCommon.props) are left untouched: they
+    stay the version of dnSpyEx this fork is based on, which also keeps merging new dnSpyEx releases simple.
+    The label is appended to the informational version (title bar, file properties) and the About screen
+    shows the label, the base version and the git commit the build was made from.
+
+      /p:DnSpyPrivateBuildLabel=rc2-private    use another label
+      /p:DnSpyPrivateBuild=false               build without the label
+  -->
+  <PropertyGroup Condition=" '$(DnSpyPrivateBuild)' != 'false' AND '$(DnSpyAssemblyInformationalVersion)' != '' ">
+    <DnSpyPrivateBuildLabel Condition=" '$(DnSpyPrivateBuildLabel)' == '' ">rc1-private</DnSpyPrivateBuildLabel>
+    <InformationalVersion>$(DnSpyAssemblyInformationalVersion)-$(DnSpyPrivateBuildLabel)</InformationalVersion>
+  </PropertyGroup>
+
+  <ItemGroup Condition=" '$(DnSpyPrivateBuild)' != 'false' AND '$(MSBuildProjectName)' == 'dnSpy' ">
+    <AssemblyMetadata Include="DnSpyPrivateBuildLabel" Value="$(DnSpyPrivateBuildLabel)" />
+    <AssemblyMetadata Include="DnSpyBaseVersion" Value="$(DnSpyAssemblyInformationalVersion)" />
+  </ItemGroup>
+
+  <Target Name="DnSpyAddBuildCommit" BeforeTargets="GetAssemblyAttributes" Condition=" '$(DnSpyPrivateBuild)' != 'false' AND '$(MSBuildProjectName)' == 'dnSpy' ">
+    <Exec Command="git rev-parse --short=10 HEAD" WorkingDirectory="$(MSBuildProjectDirectory)" ConsoleToMSBuild="true" EchoOff="true" StandardOutputImportance="low" StandardErrorImportance="low" IgnoreExitCode="true" ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="DnSpyBuildCommit" />
+      <Output TaskParameter="ExitCode" PropertyName="_DnSpyGitExitCode" />
+    </Exec>
+    <ItemGroup Condition=" '$(_DnSpyGitExitCode)' == '0' AND '$(DnSpyBuildCommit)' != '' ">
+      <AssemblyMetadata Include="DnSpyBuildCommit" Value="$(DnSpyBuildCommit)" />
+    </ItemGroup>
+  </Target>
+</Project>

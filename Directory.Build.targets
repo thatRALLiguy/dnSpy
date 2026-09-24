@@ -80,4 +80,6 @@
   <Target Name="DnSpySetAppHostLargeAddressAware" AfterTargets="_CreateAppHost" Condition=" '$(AppHostIntermediatePath)' != '' AND Exists('$(AppHostIntermediatePath)') ">
     <DnSpySetLargeAddressAware AppHostPath="$(AppHostIntermediatePath)" />
   </Target>
+
+  <Import Project="DnSpyPrivateBuild.targets" />
 </Project>

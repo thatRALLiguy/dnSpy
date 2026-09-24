@@ -206,6 +206,11 @@ namespace dnSpy.MainApp {
 #error Unknown target framework
 #endif
 			output.WriteLine($"{Constants.DnSpy} {appWindow.AssemblyInformationalVersion} ({frameworkName})", BoxedTextColor.Text);
+			if (PrivateBuildInfo.IsPrivateBuild) {
+				output.WriteLine(PrivateBuildInfo.Description, BoxedTextColor.Text);
+				if (PrivateBuildInfo.CommitDescription is string commitDescription)
+					output.WriteLine(commitDescription, BoxedTextColor.Text);
+			}
 			output.WriteLine();
 			output.WriteLine(dnSpy_Resources.AboutScreen_LicenseInfo, BoxedTextColor.Text);
 			output.WriteLine();
