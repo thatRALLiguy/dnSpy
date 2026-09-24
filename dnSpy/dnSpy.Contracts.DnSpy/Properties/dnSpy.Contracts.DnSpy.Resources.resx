@@ -189,4 +189,7 @@
     <value>Value must be type {0}.
 Error: {1}</value>
   </data>
+  <data name="BundleEntryTooLarge" xml:space="preserve">
+    <value>Not loaded: {0} is too large to load into memory ({1:N0} bytes). Use Extract Bundle Contents to save it to disk.</value>
+  </data>
 </root>

@@ -23,6 +23,7 @@ using System.Diagnostics;
 using System.IO;
 using dnlib.DotNet;
 using dnlib.PE;
+using dnSpy.Contracts.DnSpy.Properties;
 using dnSpy.Contracts.Utilities;
 
 namespace dnSpy.Contracts.Documents {
@@ -124,6 +125,19 @@ namespace dnSpy.Contracts.Documents {
 		/// </summary>
 		/// <param name="filename">Filename</param>
 		public DsUnknownDocument(string filename) => Filename = filename ?? string.Empty;
+
+		/// <summary>
+		/// Gets the reason the file couldn't be loaded or null if there's no error
+		/// </summary>
+		public string? LoadError { get; }
+
+		/// <summary>
+		/// Constructor
+		/// </summary>
+		/// <param name="filename">Filename</param>
+		/// <param name="loadError">Reason the file couldn't be loaded</param>
+		public DsUnknownDocument(string filename, string? loadError)
+			: this(filename) => LoadError = loadError;
 	}
 
 	/// <summary>
@@ -194,7 +208,13 @@ namespace dnSpy.Contracts.Documents {
 				var relativePath = entry.GetSafeRelativePath();
 				if (relativePath is null)
 					continue;
-				var document = TryCreateDocument(entry, Path.Combine(dir, relativePath));
+				var filename = Path.Combine(dir, relativePath);
+				// Show it in the tree instead of silently leaving it out. It can still be extracted to disk.
+				if (entry.Size > SingleFileBundle.MaxInMemoryEntrySize) {
+					list.Add(new DsUnknownDocument(filename, string.Format(dnSpy_Contracts_DnSpy_Resources.BundleEntryTooLarge, entry.RelativePath, entry.Size)));
+					continue;
+				}
+				var document = TryCreateDocument(entry, filename);
 				if (document is not null)
 					list.Add(document);
 			}

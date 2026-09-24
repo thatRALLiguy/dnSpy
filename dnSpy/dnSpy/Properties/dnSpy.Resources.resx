@@ -2133,4 +2133,7 @@ Filter can be changed in Assembly Explorer options.</value>
   <data name="ExtractBundle_Done" xml:space="preserve">
     <value>Extracted {0} file(s) to {1}</value>
   </data>
+  <data name="ExtractBundle_Canceled" xml:space="preserve">
+    <value>Extraction was canceled. Extracted {0} of {1} file(s) to {2}</value>
+  </data>
 </root>

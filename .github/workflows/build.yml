@@ -47,6 +47,10 @@ jobs:
 
       - uses: microsoft/setup-msbuild@v3.0.0
 
+      - name: Check bundle reading and extraction
+        if: matrix.platform == 'net' || matrix.platform == 'netframework'
+        run: dotnet run --project Tests/SingleFileBundle/SingleFileBundle.Tests.csproj -c Release -f ${{matrix.build-dir}}
+
       - name: Build dnSpy (${{matrix.platform}})
         run: .\build.ps1 ${{matrix.platform}}
 
